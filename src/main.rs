@@ -13,6 +13,9 @@ pub struct GestureDatasetApp {
 
 	#[cfg_attr(feature = "persistence", serde(skip))]
 	drawing: Vec<Vec<egui::Pos2>>,
+
+	#[cfg_attr(feature = "persistence", serde(skip))]
+	sample_count: u32,
 }
 
 impl Default for GestureDatasetApp {
@@ -25,6 +28,8 @@ impl Default for GestureDatasetApp {
 			height: 32,
 
 			drawing: Default::default(),
+
+			sample_count: 0,
 		}
 	}
 }
@@ -65,6 +70,7 @@ impl epi::App for GestureDatasetApp {
 			width,
 			height,
 			drawing: drawing,
+			sample_count,
 		} = self;
 
 		egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -130,7 +136,8 @@ impl epi::App for GestureDatasetApp {
 				drawing.clear();
 			}
 			if ui.button("Save").clicked() {
-				save_image(drawing, label, (*width, *height));
+				save_image(drawing, label, *sample_count, (*width, *height));
+				*sample_count += 1;
 				drawing.clear();
 			}
 
@@ -172,7 +179,7 @@ impl epi::App for GestureDatasetApp {
 	}
 }
 
-fn save_image(lines: &Vec<Vec<egui::Pos2>>, class_name: &String, raster_size: (u32, u32)) {
+fn save_image(lines: &Vec<Vec<egui::Pos2>>, class_name: &String, sample_number: u32, raster_size: (u32, u32)) {
 	// Lines will be all over the place, so we want to remap them to the appropriate size.
 	// Find the bounds of the drawing and remap them to the edges of the image.
 	let mut min_x = 1e32;
@@ -214,11 +221,8 @@ fn save_image(lines: &Vec<Vec<egui::Pos2>>, class_name: &String, raster_size: (u
 		}
 	}
 
-	// Count the number of data files in the directory.  Our image is one more than that.
-	let sample_count = std::fs::read_dir(class_name).unwrap().count();
-
 	// Save the example.
-	let path = format!("{}{}{}.png", class_name, std::path::MAIN_SEPARATOR, sample_count+1);
+	let path = format!("{}{}{}.png", class_name, std::path::MAIN_SEPARATOR, sample_number);
 	img.save_with_format(&path, ImageFormat::Png);
 	println!("Saved {}", &path);
 }
