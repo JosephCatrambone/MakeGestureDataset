@@ -195,8 +195,8 @@ fn save_image(lines: &Vec<Vec<egui::Pos2>>, class_name: &String, sample_number: 
 			max_y = pt.y.max(max_y);
 		}
 	}
-	max_x += 1.0;
-	max_y += 1.0;
+	max_x += 1e-6;
+	max_y += 1e-6;
 
 	// Draw the pixels.
 	// Normalize to the 0/1 range and set pixels between start and stops.
