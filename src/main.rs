@@ -104,10 +104,19 @@ impl epi::App for GestureDatasetApp {
 				ui.separator();
 
 				// For each possible directory, add a radio button.  This determines where we save the result images.
-				for g in gestures.iter() {
-					if ui.radio(g.eq(label), g).clicked() {
-						*label = g.clone();
-					}
+				let mut to_remove: Option<usize> = None;
+				for (idx, g) in gestures.iter().enumerate() {
+					ui.horizontal(|ui|{
+						if ui.radio(g.eq(label), g).clicked() {
+							*label = g.clone();
+						}
+						if ui.button("x").clicked() {
+							to_remove = Some(idx);
+						}
+					});
+				}
+				if let Some(remove_idx) = to_remove {
+					gestures.remove(remove_idx);
 				}
 
 				ui.separator();
