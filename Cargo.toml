@@ -1,0 +1,16 @@
+[package]
+name = "make_gesture_dataset"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.16.0" # Gives us egui, epi and web+native backends
+image = "0.23.14"
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+default = []
+persistence = ["eframe/persistence", "serde"] # Enable if you want to persist app state on shutdown
+
+[profile.release]
+opt-level = 2 # fast and small wasm
