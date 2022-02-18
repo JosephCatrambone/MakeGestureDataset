@@ -1,4 +1,5 @@
 use eframe::{egui, epi};
+use image::{ImageFormat, Rgb};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -79,23 +80,24 @@ impl epi::App for GestureDatasetApp {
 
 		egui::SidePanel::left("side_panel").show(ctx, |ui| {
 			ui.vertical(|ui|{
+				// This section handles the UI and creation of data directories for gesture classes.
+				// After a user types in the name of a new gesture, see if it's already on the list.
+				// If it isn't, create the data directory and add it.
 				ui.label("Add New Gesture Class: ");
-
 				ui.horizontal(|ui| {
 					ui.text_edit_singleline(label);
 					if ui.button("+").clicked() {
-						// Maybe add this new label to the gestures.
 						label.make_ascii_lowercase();
-						if !gestures.contains(&label) {
-							// This is new!  Add it to our listing and make the directory.
+						if !gestures.contains(&label) { // This is new!  Add it to our listing and make the directory.
+							let _res = std::fs::create_dir(&label);
 							gestures.push(label.clone());
-							//std::fs::create_dir(&label);
 						}
 					}
 				});
 
 				ui.separator();
 
+				// For each possible directory, add a radio button.  This determines where we save the result images.
 				for g in gestures.iter() {
 					if ui.radio(g.eq(label), g).clicked() {
 						*label = g.clone();
@@ -128,7 +130,7 @@ impl epi::App for GestureDatasetApp {
 				drawing.clear();
 			}
 			if ui.button("Save").clicked() {
-				// Save first.
+				save_image(drawing, label, (*width, *height));
 				drawing.clear();
 			}
 
@@ -167,16 +169,58 @@ impl epi::App for GestureDatasetApp {
 				painter.extend(shapes);
 			});
 		});
+	}
+}
 
-		if false {
-			egui::Window::new("Window").show(ctx, |ui| {
-				ui.label("Windows can be moved by dragging them.");
-				ui.label("They are automatically sized based on contents.");
-				ui.label("You can turn on resizing and scrolling if you like.");
-				ui.label("You would normally chose either panels OR windows.");
-			});
+fn save_image(lines: &Vec<Vec<egui::Pos2>>, class_name: &String, raster_size: (u32, u32)) {
+	// Lines will be all over the place, so we want to remap them to the appropriate size.
+	// Find the bounds of the drawing and remap them to the edges of the image.
+	let mut min_x = 1e32;
+	let mut max_x = -1e32;
+	let mut min_y = 1e32;
+	let mut max_y = -1e32;
+	for line in lines.iter() {
+		if line.len() < 2 { continue; }
+		for pt in line {
+			min_x = pt.x.min(min_x);
+			min_y = pt.y.min(min_y);
+			max_x = pt.x.max(max_x);
+			max_y = pt.y.max(max_y);
 		}
 	}
+	max_x += 1.0;
+	max_y += 1.0;
+
+	// Draw the pixels.
+	// Normalize to the 0/1 range and set pixels between start and stops.
+	let mut img = image::RgbImage::new(raster_size.0, raster_size.1);
+	for line in lines.iter() {
+		if line.len() < 2 { continue; }
+		for (pt_a, pt_b) in line.iter().zip(line.iter().skip(1)) {
+			let dx = pt_b.x - pt_a.x;
+			let dy = pt_b.y - pt_a.y;
+			let pixel_steps = dx.abs().max(dy.abs()).ceil() as u32;
+
+			for step in 0..pixel_steps {
+				let mut x = pt_a.x + (dx*step as f32 / pixel_steps as f32);
+				let mut y = pt_a.y + (dy*step as f32 / pixel_steps as f32);
+				// Convert the X/Y into the smaller form factor and set the pixel.
+				x = (x - min_x) / (max_x - min_x);
+				y = (y - min_y) / (max_y - min_y);
+
+				let mut pxl = img.get_pixel_mut((x*raster_size.0 as f32) as u32, (y*raster_size.1 as f32) as u32);
+				*pxl = Rgb::from([255, 255, 255]);
+			}
+		}
+	}
+
+	// Count the number of data files in the directory.  Our image is one more than that.
+	let sample_count = std::fs::read_dir(class_name).unwrap().count();
+
+	// Save the example.
+	let path = format!("{}{}{}.png", class_name, std::path::MAIN_SEPARATOR, sample_count+1);
+	img.save_with_format(&path, ImageFormat::Png);
+	println!("Saved {}", &path);
 }
 
 fn main() {
